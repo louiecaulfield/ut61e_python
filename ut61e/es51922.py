@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Utility for parsing data from multimeters based on Cyrustek ES51922 chipset.
@@ -224,16 +224,16 @@ def parse(packet, extended_format = False):
     d_digit4, d_digit3, d_digit2, d_digit1, d_digit0, \
     d_function, d_status, \
     d_option1, d_option2, d_option3, d_option4 = struct.unpack("B"*12, packet)
-    
+
     options = {}
     d_options = (d_status, d_option1, d_option2, d_option3, d_option4)
     OPTIONS = (STATUS, OPTION1, OPTION2, OPTION3, OPTION4)
     for d_option, OPTION in zip(d_options, OPTIONS):
         bits = get_bits(d_option, OPTION)
         options.update(bits)
-    
+
     function = FUNCTION[d_function]
-    # When the rotary switch is set to 'voltage' or 'ampere' mode and then you 
+    # When the rotary switch is set to 'voltage' or 'ampere' mode and then you
     # press the frequency button, the meter shows 'Hz' (or '%') but the
     # function byte is still the same as before so we have to correct for that:
     if options["VAHZ"]:
@@ -245,7 +245,7 @@ def parse(packet, extended_format = False):
         mode = "duty_cycle"
         unit = "%"
         m_range = (1e0, 1, "%") #2200.0°C
-    
+
     current = None
     if options["AC"] and options["DC"]:
         raise ValueError
@@ -253,7 +253,7 @@ def parse(packet, extended_format = False):
         current = "DC"
     elif options["AC"]:
         current = "AC"
-    
+
     operation = "normal"
     # sometimes there a glitch where both UL and OL are enabled in normal operation
     # so no error is raised when it occurs
@@ -261,35 +261,35 @@ def parse(packet, extended_format = False):
         operation = "underload"
     elif options["OL"]:
         operation = "overload"
-    
+
     if options["AUTO"]:
         mrange = "auto"
     else:
         mrange = "manual"
-    
+
     if options["BATT"]:
         battery_low = True
     else:
         battery_low = False
-    
+
     # relative measurement mode, received value is actual!
     if options["REL"]:
         relative = True
     else:
         relative = False
-    
+
     # data hold mode, received value is actual!
     if options["HOLD"]:
         hold = True
     else:
         hold = False
-    
+
     peak = None
     if options["MAX"]:
         peak = "max"
     elif options["MIN"]:
         peak = "min"
-    
+
     if mode == "current" and options["VBAR"]:
         pass
         """Auto μA Current
@@ -298,15 +298,15 @@ def parse(packet, extended_format = False):
         pass
         """Auto 220.00A/2200.0A
         Auto 22.000A/220.00A"""
-    
+
     if mode == "temperature" and options["VBAR"]:
         m_range = (1e0, 1, "deg") #2200.0°C
     elif mode == "temperature" and not options["VBAR"]:
         m_range = (1e0, 2, "deg") #220.00°C and °F
-    
+
     digits = [d_digit4, d_digit3, d_digit2, d_digit1, d_digit0]
     digits = [DIGITS[digit] for digit in digits]
-    
+
     display_value = 0
     for i, digit in zip(range(5), digits):
         display_value += digit*(10**(4-i))
@@ -314,7 +314,7 @@ def parse(packet, extended_format = False):
     display_value = Decimal(display_value) / 10**m_range[1]
     display_unit = m_range[2]
     value = float(display_value) * m_range[0]
-    
+
     if operation != "normal":
         display_value = ""
         value = ""
@@ -332,7 +332,7 @@ def parse(packet, extended_format = False):
         'operation'     : operation,
         'battery_low'   : battery_low
     }
-    
+
     detailed_results = {
         'packet_details' : {
             'raw_data_binary' :  packet,
@@ -363,7 +363,7 @@ def parse(packet, extended_format = False):
     if extended_format:
         results.update(detailed_results)
         return results
-    
+
     return results
 
 def output_readable(results):
@@ -424,13 +424,13 @@ def main():
     parser.add_argument('--verbose', action='store_true',
                         help='enable verbose output')
     args = parser.parse_args()
-    
+
     if args.verbose:
         log_level = logging.DEBUG
     else:
         log_level = logging.INFO
     logging.basicConfig(format='%(levelname)s:%(message)s', level=log_level)
-    
+
     output_file = None
     if args.mode == 'csv':
         timestamp = datetime.datetime.now()
@@ -456,6 +456,7 @@ def main():
         timestamp = datetime.datetime.now()
         timestamp = timestamp.isoformat(sep=' ')
         if len(line)==12:
+            results = None
             try:
                 results = parse(line)
             except Exception as e:
@@ -467,6 +468,8 @@ def main():
                 pass
             else:
                 raise NotImplementedError
+            if not results:
+                continue
             line = output_readable(results)
             print(timestamp.split(" ")[1], line)
         elif line:
